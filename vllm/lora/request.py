@@ -28,13 +28,35 @@ class LoRARequest(
     base_model_name: str | None = msgspec.field(default=None)
     tensorizer_config_dict: dict | None = None
     load_inplace: bool = False
+    peft_config: dict | None = None
+    lora_tensors: dict | None = None
 
     def __post_init__(self):
         if self.lora_int_id < 1:
             raise ValueError(f"id must be > 0, got {self.lora_int_id}")
 
-        # Ensure lora_path is not empty
-        assert self.lora_path, "lora_path cannot be empty"
+        has_path = bool(self.lora_path and self.lora_path.strip())
+        has_peft = self.peft_config is not None
+        has_tensors = self.lora_tensors is not None
+
+        if has_peft != has_tensors:
+            raise ValueError(
+                "peft_config and lora_tensors must be provided together."
+            )
+
+        has_tensor_route = has_peft and has_tensors
+
+        if has_path and has_tensor_route:
+            raise ValueError(
+                "Ambiguous LoRA source: provide either lora_path or "
+                "(peft_config + lora_tensors), not both."
+            )
+
+        if not has_path and not has_tensor_route:
+            raise ValueError(
+                "Missing LoRA source: provide lora_path for file-based LoRA, or "
+                "provide both peft_config and lora_tensors for in-memory LoRA."
+            )
 
     @property
     def adapter_id(self):
